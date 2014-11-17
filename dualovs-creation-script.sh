@@ -23,7 +23,7 @@ sleep 1
 ovs-vsctl add-port br2 eth1
 sleep 1
 
-
+#root:bismark123
 
 # create a eight virtual interfaces (the command create tow virtual interface  veth0 and veth1 )
 

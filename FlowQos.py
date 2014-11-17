@@ -16,6 +16,8 @@ import StringIO
 from time import sleep
 import sys
 
+from mac_classifier import MacClassifier
+
 log = core.getLogger()
 list_udp=[]
 list_tcp=[]
@@ -51,6 +53,9 @@ class FlowQoS (EventMixin):
 
     # Add handy function to console
     #core.Interactive.variables['lookup'] = self.lookup
+	
+	#Setup the MacClassifier
+	self.macClassifier = MacClassifier(self)
 
   def _handle_ConnectionUp (self, event):
     log.debug("Connection %s" % (event.connection,))  
@@ -113,9 +118,10 @@ class FlowQoS (EventMixin):
 
   def _handle_PacketIn (self, event):
     packet = event.parsed
-
+	
     #add defaut rule
     msg = of.ofp_flow_mod()
+	msg.priority = 10
     #msg.priority = 42
     #msg.match.dl_type = packet.type
     #msg.match.nw_dst = packet.next.srcip
@@ -125,6 +131,7 @@ class FlowQoS (EventMixin):
     core.openflow.getConnection(self.east_dpid).send(msg)
 
     msg = of.ofp_flow_mod()
+	msg.priority = 10
     #msg.priority = 42
     #msg.match.dl_type = packet.type
     #msg.match.nw_dst = packet.next.srcip
@@ -132,6 +139,9 @@ class FlowQoS (EventMixin):
     msg.actions.append(of.ofp_action_output(port = 1))
     msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
     core.openflow.getConnection(self.west_dpid).send(msg)
+	
+	#TODO notify self.macClassifier about mac address and see if its already being handled
+	#TODO if already being handled, do not proceed
 
    #self.connection.send( of.ofp_flow_mod( action=[of.ofp_action_output(port=4),of.ofp_action_output(port=OFPP_CONTROLLER)]))
     
