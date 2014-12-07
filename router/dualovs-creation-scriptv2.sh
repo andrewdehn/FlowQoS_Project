@@ -2,6 +2,24 @@
 # Before executing this script make sure to install these modules insmod veth.ko and insmod sch_tbf.ko ( /lib/modules/3.3.8/)
 # and restart the network service (/etc/init.d/network restart)
 
+# for debugging
+set -x
+
+rmmod veth
+rmmod sch_tbf
+rmmod sch_htb
+
+# remove the two OVS if they exist
+ovs-vsctl del-br br1
+ovs-vsctl del-br br2
+
+# make sure modules are installed, requires veth.ko to be located in /root and this script run from /root as root
+insmod veth.ko
+insmod /lib/modules/3.3.8/sch_tbf.ko
+insmod /lib.modules/3.3.8/sch_htb.ko
+
+
+
 # create the two OVS
 ovs-vsctl add-br br1
 sleep 1
@@ -77,6 +95,21 @@ ifconfig wlan0 promisc
 sleep 1
 
 
+ovs-vsctl add-port br1 veth0
+ovs-vsctl add-port br1 veth2
+sleep 1
+ovs-vsctl add-port br1 veth4
+ovs-vsctl add-port br1 veth6
+sleep 1
+
+ovs-vsctl add-port br2 veth1
+ovs-vsctl add-port br2 veth3
+sleep 1
+
+ovs-vsctl add-port br2 veth5
+ovs-vsctl add-port br2 veth7
+sleep 1
+
 #adding the virtual interfaces to the two OVS and make sure they are peered
 
 ovs-vsctl set interface veth0 type=patch
@@ -104,20 +137,7 @@ ovs-vsctl set interface veth7 type=patch
 ovs-vsctl set interface veth7 options:peer=veth6
 sleep 1
 
-ovs-vsctl add-port br1 veth0
-ovs-vsctl add-port br1 veth2
-sleep 1
-ovs-vsctl add-port br1 veth4
-ovs-vsctl add-port br1 veth6
-sleep 1
 
-ovs-vsctl add-port br2 veth1
-ovs-vsctl add-port br2 veth3
-sleep 1
-
-ovs-vsctl add-port br2 veth5
-ovs-vsctl add-port br2 veth7
-sleep 1
 
 
 
@@ -128,10 +148,12 @@ sleep 1
 
 #adding the controller IP address to both virtual switches
 
-ovs-vsctl set-controller br1 tcp:192.168.142.50:6633
+#ovs-vsctl set-controller br1 tcp:192.168.142.50:6633
+ovs-vsctl set-controller br1 tcp:192.168.2.4:6633
 ovs-vsctl set-fail-mode br1 secure
 sleep 1
-ovs-vsctl set-controller br2 tcp:192.168.142.50:6633
+#ovs-vsctl set-controller br2 tcp:192.168.142.50:6633
+ovs-vsctl set-controller br2 tcp:192.168.2.4:6633
 ovs-vsctl set-fail-mode br2 secure
 sleep 1
 
@@ -139,18 +161,22 @@ sleep 1
 # 5 Mbit to web, 10 Mbit to Video, 15 Mbit to P2P and 4 to VoIP (all both upload and download)
 ################# In case of tbf Qdisc ############################
 
+#Web
 tc qdisc add dev veth0 root tbf rate 5Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
 tc qdisc add dev veth1 root tbf rate 5Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
+#Video
 tc qdisc add dev veth2 root tbf rate 10Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
 tc qdisc add dev veth3 root tbf rate 10Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
+#P2P
 tc qdisc add dev veth4 root tbf rate 15Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
 tc qdisc add dev veth5 root tbf rate 15Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
+#VoIP
 tc qdisc add dev veth6 root tbf rate 4Mbit burst 10kb latency 5ms mtu 100000
 sleep 1
 tc qdisc add dev veth7 root tbf rate 4Mbit burst 10kb latency 5ms mtu 100000

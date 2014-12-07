@@ -6,15 +6,17 @@ from pox.lib.packet.arp import arp
 from pox.lib.addresses import IPAddr, EthAddr
 from pox.lib.util import str_to_bool, dpidToStr
 from pox.lib.revent import *
-import dpkt
+#import dpkt
 import socket
-import libprotoident
+#import libprotoident
 import struct
 import binascii, re
 import json
 import StringIO
 from time import sleep
 import sys
+
+from mac_classifier import MacClassifier
 
 log = core.getLogger()
 list_udp=[]
@@ -27,113 +29,15 @@ UDP=[]
 flows_dict={}
 
 
-class FlowQoS (EventMixin):
-  def __init__ (self):
+class ApplicationClassifier:
+  def __init__ (self, flowqos):
+    self.flowqos = flowqos
 
-    core.openflow.addListeners(self)
-    # Creating service-type to port mapping
-    self.east_service_to_port = { 'VIDEO': 4,
-                        'VOIP': 5,
-                        'Game': 6,
-                        'WEB': 7,
-                      }
-    
-    self.west_service_to_port = { 'VIDEO': 2,
-                        'VOIP': 3,
-                        'Game': 4,
-                        'WEB': 5,
-                      }
-    
-    self.east_dpid = int("0x0000baf8d9adad9f",16)
-    self.east_home_port = 1
-    self.west_dpid = int("0x000004a151a30fcc",16)
-    self.west_internet_port = 1
-
-    # Add handy function to console
-    #core.Interactive.variables['lookup'] = self.lookup
-
-  def _handle_ConnectionUp (self, event):
-    log.debug("Connection %s" % (event.connection,))  
-    
-      
-#     ## Packet going out from home to internet
-#     msg = of.ofp_flow_mod()
-#     msg.match.in_port = 1
-#     msg.actions.append(of.ofp_action_output(port = 2))
-#     event.connection.send(msg)
-#   
-#     ## Packet coming from internet to home
-#     msg = of.ofp_flow_mod()
-#     msg.match.in_port = 2
-#     msg.actions.append(of.ofp_action_output(port = 1))
-#     event.connection.send(msg)
-
-  def send_flow_mod(self, packet, east_port, west_port, event):
-    log.debug("installing flow for %s.%i -> %s.%i.%i" %
-               (packet.src, event.port, packet.dst, east_port, west_port))
-    if (event.dpid == self.east_dpid):
-      # East configuration
-      
-      ## Packet going out from home to internet
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.dstip
-      msg.actions.append(of.ofp_action_output(port = east_port))
-      core.openflow.getConnection(self.east_dpid).send(msg)
-      #event.connection.send(msg)
-
-      ## Packet coming from internet to home
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.srcip
-      msg.actions.append(of.ofp_action_output(port = self.east_home_port))
-      core.openflow.getConnection(self.east_dpid).send(msg)
-            # West configuration
-
-      ## Packet going out from home to internet
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.dstip
-      msg.actions.append(of.ofp_action_output(port = self.west_internet_port))
-      core.openflow.getConnection(self.west_dpid).send(msg)
-      #event.connection.send(msg)
-
-      ## Packet going out from internet to home
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.srcip
-      msg.actions.append(of.ofp_action_output(port = west_port))
-      core.openflow.getConnection(self.west_dpid).send(msg)
-      #event.connection.send(msg)
-
-
-  def _handle_PacketIn (self, event):
+  '''
+  Returns the name of the service type for this packet, or None if there is no type.
+  '''
+  def applicationServiceType(self, event):
     packet = event.parsed
-
-    #add defaut rule
-    msg = of.ofp_flow_mod()
-    #msg.priority = 42
-    #msg.match.dl_type = packet.type
-    #msg.match.nw_dst = packet.next.srcip
-    msg.actions.append(of.ofp_action_output(port = 6))
-    msg.actions.append(of.ofp_action_output(port = 1))
-    msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-    core.openflow.getConnection(self.east_dpid).send(msg)
-
-    msg = of.ofp_flow_mod()
-    #msg.priority = 42
-    #msg.match.dl_type = packet.type
-    #msg.match.nw_dst = packet.next.srcip
-    msg.actions.append(of.ofp_action_output(port = 4))
-    msg.actions.append(of.ofp_action_output(port = 1))
-    msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-    core.openflow.getConnection(self.west_dpid).send(msg)
-
-   #self.connection.send( of.ofp_flow_mod( action=[of.ofp_action_output(port=4),of.ofp_action_output(port=OFPP_CONTROLLER)]))
     
     if packet.type != ethernet.ARP_TYPE and packet.type != ethernet.IPV6_TYPE:
       if packet.next.protocol != ipv4.ICMP_PROTOCOL:
@@ -147,15 +51,16 @@ class FlowQoS (EventMixin):
               print 'dnsname: %s' % dnsname +'Type : %s' %service
               #print 'servicetype:'
               #print service
-              east_port = self.east_service_to_port[service]
-              west_port = self.west_service_to_port[service]
+#              east_port = self.east_service_to_port[service]
+#              west_port = self.west_service_to_port[service]
               #print east_port, west_port
-              self.send_flow_mod(packet, east_port, west_port, event)
+#              self.send_flow_mod(packet, east_port, west_port, event)
+              return service
         else:
           #flowQos classification
           #Check is the ip source  and destination exist in the dictionary
           
-          f=open ('/home/said/openflow/pox/pox/flowqos/flow_dict2.json','r') 
+          f=open (self.flowqos.dir + 'flow_dict2.json','r') 
           for obj in json_decoder(f): 
             flows_dict.update(obj)
             #flows_dict = json.load(f)
@@ -166,11 +71,13 @@ class FlowQoS (EventMixin):
               print key +' ->  ' +service
               if service == 'P2P':
                 service2 = 'VIDEO'
-                east_port = self.east_service_to_port[service2]
-                west_port = self.west_service_to_port[service2]
+#                east_port = self.east_service_to_port[service2]
+#                west_port = self.west_service_to_port[service2]
                 #print east_port, west_port
-                self.send_flow_mod(packet, east_port, west_port, event)
+#                self.send_flow_mod(packet, east_port, west_port, event)
+                return service2
                 #check application type and send the packet to the outplut port
+              return service
             else:
               if packet.find("udp"):
                 list_udp.append([DottedIPToInt(str(packet.find("ipv4").srcip)), 
@@ -213,13 +120,12 @@ class FlowQoS (EventMixin):
 
             flows=TCP+UDP
             # Save all the flows in one single file
-            thefile = open("/home/said/openflow/pox/pox/flowqos/log_flows.txt", "w")
+            thefile = open(self.flowqos.dir + "log_flows.txt", "w")
             for item in flows:
               thefile.write("%s\n" % item)
             thefile.close()
             # classification and writing output in a file
             classified_flows=[]
-
             for item in flows:
               libprotoident.lpi_init_library()
               classified_flows.append([IntToDottedIP(item[0]),
@@ -237,9 +143,8 @@ class FlowQoS (EventMixin):
               if item in classified_flows:
                 if item[2]!='Unknown':
                 	print item
-            
                 
-            thefile2 = open("/home/said/openflow/pox/pox/flowqos/log_classification.txt", "w")
+            thefile2 = open(self.flowqos.dir + "log_classification.txt", "w")
             for item2 in classified_flows:
             	thefile2.write("%s\n" % item2)
             thefile2.close()
@@ -265,17 +170,28 @@ class FlowQoS (EventMixin):
                           flows_dict[repr(key)]=flows_dict[key]
                         except:
                           pass
-            f2=open ('/home/said/openflow/pox/pox/flowqos/flow_dict2.json','w+')
+            f2=open (self.flowqos.dir + 'flow_dict2.json','w+')
             json.dump(flows_dict,f2)
                         
             #print flows_dict
             # print flows_dict.keys()	
             f2.close()
-   			
-    
-    
-    
-            
+          f.close()
+          
+          f=open (self.flowqos.dir + 'flow_dict2.json','r') 
+          for obj in json_decoder(f): 
+            flows_dict.update(obj)
+            key = str(packet.find("ipv4").srcip)+','+str(packet.find("ipv4").dstip)
+            if key in flows_dict:
+              service = flows_dict[key]
+              print key +' ->  ' +service
+              if service == 'P2P':
+                service2 = 'VIDEO'
+                return service2
+              return service
+          f.close()
+  
+    return None
 
 def json_decoder(fo): 
     buff = '' 
@@ -322,7 +238,6 @@ def shifting(b):
        return payload[0]
 
 
-
 def clean(a):
     value=0
     b=[]
@@ -330,6 +245,7 @@ def clean(a):
         if value not in element:
             b.append(element)
     return b
+
 
 def shiftpyaload(b):
     a=b[::-1]
@@ -348,6 +264,7 @@ def DottedIPToInt( dotted_ip ):
                 exp = exp - 1
         return(intip)
 
+
 def IntToDottedIP( intip ):
         octet = ''
         for exp in [3,2,1,0]:
@@ -355,10 +272,12 @@ def IntToDottedIP( intip ):
                 intip = intip % ( 256 ** exp )
         return(octet.rstrip('.'))
 
+
 def asciirepl(match):
   # replace the hexadecimal characters with ascii characters
   s = match.group()
   return binascii.unhexlify(s)
+
 
 def reformat_content(data):
   p = re.compile(r'\\x(\w{2})')
@@ -368,51 +287,4 @@ def reformat_content(data):
 def jdefault(o):
     return o.__dict__
 
-            
-def send_flow_mod(self, packet, east_port, west_port, event):
-    log.debug("installing flow for %s.%i -> %s.%i.%i" %
-               (packet.src, event.port, packet.dst, east_port, west_port))
-    if (event.dpid == self.east_dpid):
-      # East configuration 
-      
-      ## Packet going out from home to internet
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.dstip
-      msg.actions.append(of.ofp_action_output(port = east_port))
-      core.openflow.getConnection(self.east_dpid).send(msg)
-      #event.connection.send(msg)
-      
-      ## Packet coming from internet to home
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.srcip
-      msg.actions.append(of.ofp_action_output(port = self.east_home_port))
-      core.openflow.getConnection(self.east_dpid).send(msg)
-      #event.connection.send(msg)
-      
-      # West configuration
-      
-      ## Packet going out from home to internet
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.dstip
-      msg.actions.append(of.ofp_action_output(port = self.west_internet_port))
-      core.openflow.getConnection(self.west_dpid).send(msg)
-      #event.connection.send(msg)
-      
-      ## Packet going out from internet to home
-      msg = of.ofp_flow_mod()
-      msg.priority = 42
-      msg.match.dl_type = packet.type
-      msg.match.nw_dst = packet.next.srcip
-      msg.actions.append(of.ofp_action_output(port = west_port))
-      core.openflow.getConnection(self.west_dpid).send(msg)
-      #event.connection.send(msg)
-
-def launch ():
   
-  core.registerNew(FlowQoS)
