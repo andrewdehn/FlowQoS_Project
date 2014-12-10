@@ -46,8 +46,8 @@ Configuring Router:
 
 Things to be completed:
 ==========================
-*The IP blocking security feature has not yet been fully installed, since there is not use using it on the mininet topology. It will
+    *The IP blocking security feature has not yet been fully installed, since there is not use using it on the mininet topology. If you wish to experiment with the IP blocking security feature, see the securityCheck() function in FlowQos.py
 
 Known Bugs:
 ==============
-*It seems that the first set of packets of a flow are not routed properly according to the rules installed on the OVS switchs. The second set of packets always seems to go through, however.
+    *It seems that the first set of packets of a flow are not routed properly according to the rules installed on the OVS switchs. The second set of packets always seems to go through, however.

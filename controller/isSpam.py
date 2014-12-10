@@ -28,7 +28,7 @@ def isSpam(IP):
 class SpamChecker:
 
     def __init__(self, flowqos):
-        self.flowqos = flowqos0
+        self.flowqos = flowqos
         
     def checkSpam(self, ipAddress):
         ipAddress = str(ipAddress)

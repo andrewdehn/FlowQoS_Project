@@ -16,6 +16,7 @@ import StringIO
 from time import sleep
 import sys
 
+from isSpam import SpamChecker
 from mac_learner import MacLearner
 from mac_classifier import MacClassifier
 from application_classifier import ApplicationClassifier
@@ -58,6 +59,9 @@ class FlowQoS (EventMixin):
     
     self.dir = baseDir
     self.log = log
+    
+    # Setup SpamChecker
+    self.spamChecker = SpamChecker(self)
     
     # Setup the MacLearner
     self.macLearner = MacLearner(self)
@@ -268,6 +272,13 @@ class FlowQoS (EventMixin):
 
   def securityCheck(self, event):
     return False
+#    packet = event.parsed
+#    if packet.type == ethernet.IP_TYPE:
+#        dstSpam = self.spamChecker.checkSpam(packet.next.dstip)
+#        srcSpam = self.spamChecker.checkSpam(packet.next.srcip)
+#        if dstSpam is True or srcSpam is True:
+#            return True
+#    return False
     
   '''
   Returns dictionary containing 'serviceType' and 'priority'. Returns None if there is no service type available.
