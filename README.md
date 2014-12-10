@@ -52,3 +52,10 @@ Things to be completed:
 Known Bugs:
 ==============
 * It seems that the first set of packets of a flow are not routed properly according to the rules installed on the OVS switchs. The second set of packets always seems to go through, however.
+
+Contributors:
+================
+* Andrew Dehn (adehn3@gatech.edu)
+* Chris Thompson (chris.rob.thompson@gmail.com )
+* Marcus Ray Taylor II (ssj3hawks@gmail.com)
+Other's worked on previous iterations of this project. See the previous project repository for details. https://github.com/mseddiki/FlowQoS_Project
